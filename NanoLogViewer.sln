@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NanoLogViewer", "NanoLogViewer.csproj", "{828096BA-467B-475F-9D75-F25DE6EFB63E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{828096BA-467B-475F-9D75-F25DE6EFB63E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{828096BA-467B-475F-9D75-F25DE6EFB63E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CF80789D-5465-48F9-B435-926B443A0EE8}
+	EndGlobalSection
+EndGlobal
