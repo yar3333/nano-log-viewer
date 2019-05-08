@@ -28,6 +28,8 @@ namespace NanoLogViewer.Forms
 
 			InitializeComponent();
 
+            wbDetails.Navigate("about:blank");
+
             if (File.Exists(sourcesIniFileName))
             {
                 foreach (var source in File.ReadAllLines(sourcesIniFileName))
@@ -126,6 +128,8 @@ namespace NanoLogViewer.Forms
 
 		void parse(string text)
 		{
+            wbDetails.DocumentText = "";
+
             text = text.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "\r\n");
 
             for (var i = 0; i < lvLogLines.Columns.Count; i++)
@@ -169,12 +173,17 @@ namespace NanoLogViewer.Forms
             {
                 if (columnWidths.ContainsKey(lvLogLines.Columns[i].Name)) lvLogLines.Columns[i].Width = columnWidths[lvLogLines.Columns[i].Name];
             }
+
+            if (lvLogLines.Items.Count > 0)
+            {
+                lvLogLines.EnsureVisible(lvLogLines.Items.Count - 1);
+                lvLogLines.Items[lvLogLines.Items.Count - 1].Selected = true;
+            }
         }
 
         private void lvLogLines_SelectedIndexChanged(object sender, EventArgs e)
 		{
 			var item = lvLogLines.SelectedItems.Count == 1 ? lvLogLines.SelectedItems[0] : null;
-
 			wbDetails.DocumentText = item != null ? "<pre>" + jobjectToString((JObject)item.Tag) + "</pre>" : "";
 		}
 
