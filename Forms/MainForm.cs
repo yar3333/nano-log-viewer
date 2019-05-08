@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Text;
@@ -21,6 +22,7 @@ namespace NanoLogViewer.Forms
         string columnsIniFileName => Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location) + "\\columns.ini";
 
         readonly Dictionary<string, int> columnWidths = new Dictionary<string, int>();
+        readonly Dictionary<string, int> columnIndexes = new Dictionary<string, int>();
 
 		public MainForm()
 		{
@@ -40,11 +42,13 @@ namespace NanoLogViewer.Forms
 
             if (File.Exists(columnsIniFileName))
             {
+                var i = 0;
                 foreach (var column in File.ReadAllLines(columnsIniFileName))
                 {
                     if (!string.IsNullOrWhiteSpace(column))
                     {
                         columnWidths[column.Split(':')[0]] = int.Parse(column.Split(':')[1]);
+                        columnIndexes[column.Split(':')[0]] = i; i++;
                     }
                 }
             }
@@ -126,8 +130,8 @@ namespace NanoLogViewer.Forms
             }
 		}
 
-		void parse(string text)
-		{
+        void parse(string text)
+        {
             wbDetails.DocumentText = "";
 
             text = text.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "\r\n");
@@ -135,43 +139,58 @@ namespace NanoLogViewer.Forms
             for (var i = 0; i < lvLogLines.Columns.Count; i++)
             {
                 columnWidths[lvLogLines.Columns[i].Name] = lvLogLines.Columns[i].Width;
+                columnIndexes[lvLogLines.Columns[i].Name] = i;
             }
 
             lvLogLines.Clear();
 
-			var lines = text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-			foreach (var json in lines)
-			{
-				var obj = JObject.Parse(json);
+            var lines = text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var json in lines)
+            {
+                var obj = JObject.Parse(json);
 
-				foreach (var prop in obj)
-				{
-					if (!lvLogLines.Columns.ContainsKey(prop.Key))
-					{
-						lvLogLines.Columns.Add(prop.Key, prop.Key);
-					}
-				}
+                foreach (var prop in obj)
+                {
+                    if (!lvLogLines.Columns.ContainsKey(prop.Key))
+                    {
+                        lvLogLines.Columns.Add(prop.Key, prop.Key);
+                    }
+                }
 
-			}
+            }
 
-			foreach (var json in lines)
-			{
-				var obj = JObject.Parse(json);
+            foreach (var json in lines)
+            {
+                var obj = JObject.Parse(json);
 
                 var subItems = new List<string>();
                 foreach (ColumnHeader col in lvLogLines.Columns)
-				{
+                {
                     subItems.Add(obj[col.Name]?.ToString() ?? "");
-				}
+                }
 
                 var item = new ListViewItem(subItems.ToArray());
                 item.Tag = obj;
                 lvLogLines.Items.Add(item);
-			}
+            }
 
-            for (var i = 0; i < lvLogLines.Columns.Count; i++)
+            foreach (ColumnHeader col in lvLogLines.Columns)
             {
-                if (columnWidths.ContainsKey(lvLogLines.Columns[i].Name)) lvLogLines.Columns[i].Width = columnWidths[lvLogLines.Columns[i].Name];
+                if (columnWidths.ContainsKey(col.Name))
+                {
+                    col.Width = columnWidths[col.Name];
+                    col.DisplayIndex = columnIndexes[col.Name];
+                }
+                else
+                {
+                    columnWidths[col.Name] = col.Width;
+                    columnIndexes[col.Name] = lvLogLines.Columns.Cast<ColumnHeader>().Select(x => columnIndexes.ContainsKey(x.Name) ? columnIndexes[x.Name] : 0).Max() + 1;
+                }
+            }
+            var keys = lvLogLines.Columns.Cast<ColumnHeader>().Select(x => x.Name).OrderBy(x => columnIndexes[x]).ToList();
+            foreach (ColumnHeader col in lvLogLines.Columns)
+            {
+                col.DisplayIndex = keys.IndexOf(col.Name);
             }
 
             if (lvLogLines.Items.Count > 0)
@@ -214,10 +233,15 @@ namespace NanoLogViewer.Forms
             }
             File.WriteAllLines(sourcesIniFileName, sources);
 
-            var columns = new List<string>();
-            foreach (var kv in columnWidths)
+            foreach (ColumnHeader col in lvLogLines.Columns)
             {
-                columns.Add(kv.Key + ":" + kv.Value);
+                columnIndexes[col.Name] = col.DisplayIndex;
+            }
+
+            var columns = new List<string>();
+            foreach (var key in columnIndexes.OrderBy(x => x.Value).Select(x => x.Key))
+            {
+                columns.Add(key + ":" + columnWidths[key]);
             }
             File.WriteAllLines(columnsIniFileName, columns);
         }
