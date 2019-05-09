@@ -119,6 +119,7 @@ namespace NanoLogViewer.Forms
                         catch (Exception ee)
                         {
                             runInFormThread(() => MessageBox.Show(this, ee.Message, "Downloading error", MessageBoxButtons.OK));
+                            btUpdate.Enabled = true;
                         }
                     });
                 }
