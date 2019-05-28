@@ -146,8 +146,11 @@ namespace NanoLogViewer.Forms
             lvLogLines.Clear();
 
             var lines = text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var json in lines)
+            foreach (var line in lines)
             {
+                var json = line.Trim();
+                if (!json.StartsWith("{")) continue;
+
                 var obj = JObject.Parse(json);
 
                 foreach (var prop in obj)
