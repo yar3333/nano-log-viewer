@@ -135,7 +135,7 @@ namespace NanoLogViewer.Forms
         {
             wbDetails.DocumentText = "";
 
-            text = text.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "\r\n");
+            text = text.Replace("\r\n", "\n").Replace("\r", "\n");
 
             for (var i = 0; i < lvLogLines.Columns.Count; i++)
             {
@@ -163,8 +163,11 @@ namespace NanoLogViewer.Forms
 
             }
 
-            foreach (var json in lines)
+            foreach (var line in lines)
             {
+                var json = line.Trim();
+                if (!json.StartsWith("{")) continue;
+
                 var obj = JObject.Parse(json);
 
                 var subItems = new List<string>();
