@@ -205,8 +205,7 @@ namespace NanoLogViewer.Forms
                 var subItems = new List<string>();
                 foreach (ColumnHeader col in lvLogLines.Columns)
                 {
-                    var value = obj[col.Name];
-                    subItems.Add(value?.Type == JTokenType.Date ? ((DateTime)value).ToLocalTime().ToShortTimeString() : value?.ToString() ?? "");
+                    subItems.Add(jtokenToString(obj[col.Name]));
                 }
 
                 var item = new ListViewItem(subItems.ToArray());
@@ -245,6 +244,19 @@ namespace NanoLogViewer.Forms
             noRemeberColumns = false;
         }
 
+        private string jtokenToString(JToken value)
+        {
+            if (value == null) return "";
+
+            if (value.Type == JTokenType.Date)
+            {
+                var dt = ((DateTime)value).ToLocalTime();
+                return dt.ToShortDateString() + " " + dt.ToShortTimeString();
+            }
+
+            return value.ToString() ?? "";
+        }
+
         private void lvLogLines_SelectedIndexChanged(object sender, EventArgs e)
 		{
 			var item = lvLogLines.SelectedItems.Count == 1 ? lvLogLines.SelectedItems[0] : null;
@@ -262,7 +274,7 @@ namespace NanoLogViewer.Forms
                 }
                 else
                 {
-                    var value = prop.Value.ToString().Replace("\r\n", "\n").Replace("\r", "\n").Trim();
+                    var value = jtokenToString(prop.Value).Replace("\r\n", "\n").Replace("\r", "\n").Trim();
                     s += prop.Key + ": " + (value.Contains("\n") ? "\n\t" + value.Replace("\n", "\n\t") : value) + "\n";
                 }
             }
