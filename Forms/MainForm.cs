@@ -24,7 +24,9 @@ namespace NanoLogViewer.Forms
         readonly Dictionary<string, int> columnWidths = new Dictionary<string, int>();
         readonly Dictionary<string, int> columnIndexes = new Dictionary<string, int>();
 
-		public MainForm()
+        bool noRemeberColumns = false;
+
+        public MainForm()
 		{
 			synchronizationContext = SynchronizationContext.Current;
 
@@ -75,12 +77,22 @@ namespace NanoLogViewer.Forms
 			}
 		}
 
-		private void btUpdate_Click(object sender, EventArgs e)
-		{
-			btUpdate.Enabled = false;
+        private void btUpdate_Click(object sender, EventArgs e)
+        {
+            var urlHistory = new List<string>();
+            for (var i = 0; i < cbSource.Items.Count; i++)
+            {
+                urlHistory.Add(cbSource.GetItemText(cbSource.Items[i]));
+            }
 
-			var uri = cbSource.Text.Trim();
-			if (uri != "")
+            updateInner(cbSource.Text.Trim(), urlHistory);
+        }
+
+        private void updateInner(string uri, List<string> urlHistory)
+		{
+            btUpdate.Enabled = false;
+
+            if (uri != "")
 			{
                 var has = false;
                 for (var i = 0; i < cbSource.Items.Count; i++)
@@ -113,11 +125,36 @@ namespace NanoLogViewer.Forms
                                 {
                                     parse(text);
                                     btUpdate.Enabled = true;
+                                    cbSource.Text = uri;
                                 });
                             }
                         }
                         catch (Exception ee)
                         {
+                            if (ee is WebException)
+                            {
+                                var response = ((WebException)ee).Response as HttpWebResponse;
+                                if (response?.StatusCode == HttpStatusCode.Unauthorized)
+                                {
+                                    var parsedUri = new Uri(uri);
+                                    if (parsedUri.UserInfo == "")
+                                    {
+                                        foreach (var h in urlHistory)
+                                        {
+                                            if (h.StartsWith("http://") || h.StartsWith("https://"))
+                                            {
+                                                var pu = new Uri(h);
+                                                if (pu.Host == parsedUri.Host && pu.UserInfo != "")
+                                                {
+                                                    runInFormThread(() => updateInner(parsedUri.Scheme + "://" + pu.UserInfo + "@" + parsedUri.Host + parsedUri.PathAndQuery, new List<string>()));
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             runInFormThread(() => MessageBox.Show(this, ee.Message, "Downloading error", MessageBoxButtons.OK));
                             btUpdate.Enabled = true;
                         }
@@ -133,15 +170,11 @@ namespace NanoLogViewer.Forms
 
         void parse(string text)
         {
+            noRemeberColumns = true;
+
             wbDetails.DocumentText = "";
 
             text = text.Replace("\r\n", "\n").Replace("\r", "\n");
-
-            for (var i = 0; i < lvLogLines.Columns.Count; i++)
-            {
-                columnWidths[lvLogLines.Columns[i].Name] = lvLogLines.Columns[i].Width;
-                columnIndexes[lvLogLines.Columns[i].Name] = i;
-            }
 
             lvLogLines.Clear();
 
@@ -160,7 +193,6 @@ namespace NanoLogViewer.Forms
                         lvLogLines.Columns.Add(prop.Key, prop.Key);
                     }
                 }
-
             }
 
             foreach (var line in lines)
@@ -173,7 +205,8 @@ namespace NanoLogViewer.Forms
                 var subItems = new List<string>();
                 foreach (ColumnHeader col in lvLogLines.Columns)
                 {
-                    subItems.Add(obj[col.Name]?.ToString() ?? "");
+                    var value = obj[col.Name];
+                    subItems.Add(value?.Type == JTokenType.Date ? ((DateTime)value).ToLocalTime().ToShortTimeString() : value?.ToString() ?? "");
                 }
 
                 var item = new ListViewItem(subItems.ToArray());
@@ -181,23 +214,26 @@ namespace NanoLogViewer.Forms
                 lvLogLines.Items.Add(item);
             }
 
-            foreach (ColumnHeader col in lvLogLines.Columns)
+            var columns = new List<ColumnHeader>();
+            foreach (ColumnHeader col in lvLogLines.Columns) columns.Add(col);
+
+            var sortedColumns = columns.Select(col => Tuple.Create(col, columnWidths.ContainsKey(col.Name) ? columnIndexes[col.Name] : 1000))
+                                       .OrderBy(x => x.Item2).ThenBy(x => x.Item1.Name)
+                                       .ToArray();
+
+            for (var i = 0; i < sortedColumns.Length; i++)
             {
+                var col = sortedColumns[i].Item1;
                 if (columnWidths.ContainsKey(col.Name))
                 {
                     col.Width = columnWidths[col.Name];
-                    col.DisplayIndex = columnIndexes[col.Name];
                 }
                 else
                 {
                     columnWidths[col.Name] = col.Width;
-                    columnIndexes[col.Name] = lvLogLines.Columns.Cast<ColumnHeader>().Select(x => columnIndexes.ContainsKey(x.Name) ? columnIndexes[x.Name] : 0).Max() + 1;
+                    columnIndexes[col.Name] = sortedColumns[i].Item2;
                 }
-            }
-            var keys = lvLogLines.Columns.Cast<ColumnHeader>().Select(x => x.Name).OrderBy(x => columnIndexes[x]).ToList();
-            foreach (ColumnHeader col in lvLogLines.Columns)
-            {
-                col.DisplayIndex = keys.IndexOf(col.Name);
+                col.DisplayIndex = i;
             }
 
             if (lvLogLines.Items.Count > 0)
@@ -205,6 +241,8 @@ namespace NanoLogViewer.Forms
                 lvLogLines.EnsureVisible(lvLogLines.Items.Count - 1);
                 lvLogLines.Items[lvLogLines.Items.Count - 1].Selected = true;
             }
+
+            noRemeberColumns = false;
         }
 
         private void lvLogLines_SelectedIndexChanged(object sender, EventArgs e)
@@ -240,10 +278,7 @@ namespace NanoLogViewer.Forms
             }
             File.WriteAllLines(sourcesIniFileName, sources);
 
-            foreach (ColumnHeader col in lvLogLines.Columns)
-            {
-                columnIndexes[col.Name] = col.DisplayIndex;
-            }
+            rememberListState();
 
             var columns = new List<string>();
             foreach (var key in columnIndexes.OrderBy(x => x.Value).Select(x => x.Key))
@@ -251,6 +286,27 @@ namespace NanoLogViewer.Forms
                 columns.Add(key + ":" + columnWidths[key]);
             }
             File.WriteAllLines(columnsIniFileName, columns);
+        }
+
+        private void LvLogLines_ColumnReordered(object sender, ColumnReorderedEventArgs e)
+        {
+            rememberListState();
+        }
+
+        private void LvLogLines_ColumnWidthChanged(object sender, ColumnWidthChangedEventArgs e)
+        {
+            rememberListState();
+        }
+
+        private void rememberListState()
+        {
+            if (noRemeberColumns) return;
+
+            foreach (ColumnHeader col in lvLogLines.Columns)
+            {
+                columnWidths[col.Name] = col.Width;
+                columnIndexes[col.Name] = col.DisplayIndex;
+            }
         }
     }
 }

@@ -88,6 +88,8 @@ namespace NanoLogViewer.Forms
             this.lvLogLines.TabIndex = 16;
             this.lvLogLines.UseCompatibleStateImageBehavior = false;
             this.lvLogLines.View = System.Windows.Forms.View.Details;
+            this.lvLogLines.ColumnReordered += new System.Windows.Forms.ColumnReorderedEventHandler(this.LvLogLines_ColumnReordered);
+            this.lvLogLines.ColumnWidthChanged += new System.Windows.Forms.ColumnWidthChangedEventHandler(this.LvLogLines_ColumnWidthChanged);
             this.lvLogLines.SelectedIndexChanged += new System.EventHandler(this.lvLogLines_SelectedIndexChanged);
             // 
             // btUpdate
