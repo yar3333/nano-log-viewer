@@ -244,19 +244,6 @@ namespace NanoLogViewer.Forms
             noRemeberColumns = false;
         }
 
-        private string jtokenToString(JToken value)
-        {
-            if (value == null) return "";
-
-            if (value.Type == JTokenType.Date)
-            {
-                var dt = ((DateTime)value).ToLocalTime();
-                return dt.ToShortDateString() + " " + dt.ToShortTimeString();
-            }
-
-            return value.ToString() ?? "";
-        }
-
         private void lvLogLines_SelectedIndexChanged(object sender, EventArgs e)
 		{
 			var item = lvLogLines.SelectedItems.Count == 1 ? lvLogLines.SelectedItems[0] : null;
@@ -280,6 +267,19 @@ namespace NanoLogViewer.Forms
             }
 			return s.Trim();
 		}
+
+        private string jtokenToString(JToken value)
+        {
+            if (value == null) return "";
+
+            if (value.Type == JTokenType.Date)
+            {
+                var dt = ((DateTime)value).ToLocalTime();
+                return dt.ToString("yyyy-MM-dd HH:mm:ss");
+            }
+
+            return value.ToString() ?? "";
+        }
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
