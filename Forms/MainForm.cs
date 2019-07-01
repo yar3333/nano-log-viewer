@@ -233,6 +233,8 @@ namespace NanoLogViewer.Forms
             }
 
             noRemeberColumns = false;
+
+            lvLogLines.Refresh();
         }
 
         private void lvLogLines_SelectedIndexChanged(object sender, EventArgs e)
