@@ -41,6 +41,7 @@ namespace NanoLogViewer.Forms
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.wbDetails = new System.Windows.Forms.WebBrowser();
             this.cbSource = new System.Windows.Forms.ComboBox();
+            this.cbTailMB = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -66,7 +67,7 @@ namespace NanoLogViewer.Forms
             // 
             this.btSelectSourceFile.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.btSelectSourceFile.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
-            this.btSelectSourceFile.Location = new System.Drawing.Point(793, 12);
+            this.btSelectSourceFile.Location = new System.Drawing.Point(708, 13);
             this.btSelectSourceFile.Name = "btSelectSourceFile";
             this.btSelectSourceFile.Size = new System.Drawing.Size(75, 23);
             this.btSelectSourceFile.TabIndex = 13;
@@ -96,7 +97,7 @@ namespace NanoLogViewer.Forms
             // 
             this.btUpdate.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.btUpdate.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(204)));
-            this.btUpdate.Location = new System.Drawing.Point(881, 6);
+            this.btUpdate.Location = new System.Drawing.Point(789, 7);
             this.btUpdate.Name = "btUpdate";
             this.btUpdate.Size = new System.Drawing.Size(75, 33);
             this.btUpdate.TabIndex = 17;
@@ -141,15 +142,30 @@ namespace NanoLogViewer.Forms
             this.cbSource.FormattingEnabled = true;
             this.cbSource.Location = new System.Drawing.Point(65, 13);
             this.cbSource.Name = "cbSource";
-            this.cbSource.Size = new System.Drawing.Size(722, 23);
+            this.cbSource.Size = new System.Drawing.Size(637, 23);
             this.cbSource.TabIndex = 17;
             this.cbSource.Text = "http://";
+            this.cbSource.SelectedIndexChanged += new System.EventHandler(this.CbSource_SelectedIndexChanged);
+            // 
+            // cbTailMB
+            // 
+            this.cbTailMB.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.cbTailMB.AutoSize = true;
+            this.cbTailMB.Checked = true;
+            this.cbTailMB.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.cbTailMB.Location = new System.Drawing.Point(871, 16);
+            this.cbTailMB.Name = "cbTailMB";
+            this.cbTailMB.Size = new System.Drawing.Size(91, 17);
+            this.cbTailMB.TabIndex = 19;
+            this.cbTailMB.Text = "Load tail 1MB";
+            this.cbTailMB.UseVisualStyleBackColor = true;
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(968, 447);
+            this.Controls.Add(this.cbTailMB);
             this.Controls.Add(this.cbSource);
             this.Controls.Add(this.splitContainer1);
             this.Controls.Add(this.btUpdate);
@@ -178,6 +194,7 @@ namespace NanoLogViewer.Forms
 		private SplitContainer splitContainer1;
 		private WebBrowser wbDetails;
         private ComboBox cbSource;
+        private CheckBox cbTailMB;
     }
 }
 

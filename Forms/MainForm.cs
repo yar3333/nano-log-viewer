@@ -91,6 +91,7 @@ namespace NanoLogViewer.Forms
         private void updateInner(string uri, List<string> urlHistory)
 		{
             btUpdate.Enabled = false;
+            var isLoadTail = cbTailMB.Checked;
 
             if (uri != "")
 			{
@@ -107,27 +108,14 @@ namespace NanoLogViewer.Forms
                     {
                         try
                         {
-                            //ServicePointManager.Expect100Continue = true;
-                            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-                            ServicePointManager.ServerCertificateValidationCallback = new RemoteCertificateValidationCallback(delegate { return true; });
-                            using (var client = new WebClient())
+                            var size = isLoadTail ? HttpTools.getSize(uri) : null;
+                            var text = HttpTools.download(uri, size != null ? (int?)Math.Max(0, size.Value - 1024*1024) : null);
+                            runInFormThread(() =>
                             {
-                                var parsedUri = new Uri(uri);
-                                if (!string.IsNullOrEmpty(parsedUri.UserInfo))
-                                {
-                                    string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(parsedUri.UserInfo));
-                                    client.Headers[HttpRequestHeader.Authorization] = "Basic " + credentials;
-
-                                }
-
-                                var text = client.DownloadString(uri);
-                                runInFormThread(() =>
-                                {
-                                    parse(text);
-                                    btUpdate.Enabled = true;
-                                    cbSource.Text = uri;
-                                });
-                            }
+                                parse(text);
+                                btUpdate.Enabled = true;
+                                cbSource.Text = uri;
+                            });
                         }
                         catch (Exception ee)
                         {
@@ -155,8 +143,11 @@ namespace NanoLogViewer.Forms
                                 }
                             }
 
-                            runInFormThread(() => MessageBox.Show(this, ee.Message, "Downloading error", MessageBoxButtons.OK));
-                            btUpdate.Enabled = true;
+                            runInFormThread(() =>
+                            {
+                                MessageBox.Show(this, ee.Message, "Downloading error", MessageBoxButtons.OK);
+                                btUpdate.Enabled = true;
+                            });
                         }
                     });
                 }
@@ -284,7 +275,7 @@ namespace NanoLogViewer.Forms
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
             var sources = new List<string>();
-            for (var i = 0; i < cbSource.Items.Count; i++)
+            for (var i = Math.Max(0, cbSource.Items.Count - 10); i < cbSource.Items.Count; i++)
             {
                 sources.Add(cbSource.GetItemText(cbSource.Items[i]));
             }
@@ -319,6 +310,11 @@ namespace NanoLogViewer.Forms
                 columnWidths[col.Name] = col.Width;
                 columnIndexes[col.Name] = col.DisplayIndex;
             }
+        }
+
+        private void CbSource_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            btUpdate_Click(null, null);
         }
     }
 }
