@@ -88,6 +88,15 @@ namespace NanoLogViewer.Forms
             updateInner(cbSource.Text.Trim(), urlHistory);
         }
 
+        private bool isCbSourceItemsContains(string uri)
+        {
+            for (var i = 0; i < cbSource.Items.Count; i++)
+            {
+                if (cbSource.GetItemText(cbSource.Items[i]) == uri) return true;
+            }
+            return false;
+        }
+
         private void updateInner(string uri, List<string> urlHistory)
 		{
             btUpdate.Enabled = false;
@@ -95,13 +104,6 @@ namespace NanoLogViewer.Forms
 
             if (uri != "")
 			{
-                var has = false;
-                for (var i = 0; i < cbSource.Items.Count; i++)
-                {
-                    if (cbSource.GetItemText(cbSource.Items[i]) == uri) { has = true; break; }
-                }
-                if (!has) cbSource.Items.Add(uri);
-
                 if (uri.StartsWith("http://") || uri.StartsWith("https://"))
 				{
                     Task.Run(() =>
@@ -112,6 +114,7 @@ namespace NanoLogViewer.Forms
                             var text = HttpTools.download(uri, size != null ? (int?)Math.Max(0, size.Value - 1024*1024) : null);
                             runInFormThread(() =>
                             {
+                                if (!isCbSourceItemsContains(uri)) cbSource.Items.Add(uri);
                                 parse(text);
                                 btUpdate.Enabled = true;
                                 cbSource.Text = uri;
@@ -153,8 +156,16 @@ namespace NanoLogViewer.Forms
                 }
                 else
 				{
-                    parse(File.ReadAllText(uri));
-                    btUpdate.Enabled = true;
+                    if (File.Exists(uri))
+                    {
+                        if (!isCbSourceItemsContains(uri)) cbSource.Items.Add(uri);
+                        parse(File.ReadAllText(uri));
+                        btUpdate.Enabled = true;
+                    }
+                    else
+                    {
+                        MessageBox.Show(this, "File not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
             }
 		}
