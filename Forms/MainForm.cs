@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using NanoLogViewer.Models;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace NanoLogViewer.Forms
@@ -20,11 +21,16 @@ namespace NanoLogViewer.Forms
 
         string sourcesIniFileName => Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location) + "\\sources.ini";
         string columnsIniFileName => Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location) + "\\columns.ini";
+        string filtersIniFileName => Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location) + "\\filters.ini";
 
         readonly Dictionary<string, int> columnWidths = new Dictionary<string, int>();
         readonly Dictionary<string, int> columnIndexes = new Dictionary<string, int>();
 
         bool noRemeberColumns = false;
+
+        private List<JObject> allLoadedObjects = new List<JObject>();
+
+        List<ComboBox> freezed = new List<ComboBox>();
 
         public MainForm()
 		{
@@ -55,12 +61,46 @@ namespace NanoLogViewer.Forms
                 }
             }
 
+            if (File.Exists(filtersIniFileName))
+            {
+                foreach (var filter in File.ReadAllLines(filtersIniFileName))
+                {
+                    if (!string.IsNullOrWhiteSpace(filter)) cbFilter.Items.Add(filter);
+                }
+            }
+
             var args = Environment.GetCommandLineArgs();
 			if (args.Length == 2)
 			{
 				cbSource.Text = args[1];
 				btUpdate_Click(null, null);
 			}
+        }
+
+        private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            var sources = new List<string>();
+            for (var i = 0; i < Math.Min(10, cbSource.Items.Count); i++)
+            {
+                sources.Add(cbSource.GetItemText(cbSource.Items[i]));
+            }
+            File.WriteAllLines(sourcesIniFileName, sources);
+
+            rememberListState();
+
+            var columns = new List<string>();
+            foreach (var key in columnIndexes.OrderBy(x => x.Value).Select(x => x.Key))
+            {
+                columns.Add(key + ":" + columnWidths[key]);
+            }
+            File.WriteAllLines(columnsIniFileName, columns);
+            
+            var filters = new List<string>();
+            for (var i = 0; i < Math.Min(10, cbFilter.Items.Count); i++)
+            {
+                filters.Add(cbFilter.GetItemText(cbFilter.Items[i]));
+            }
+            File.WriteAllLines(filtersIniFileName, filters);
         }
 
         private void runInFormThread(Action work)
@@ -80,21 +120,12 @@ namespace NanoLogViewer.Forms
         private void btUpdate_Click(object sender, EventArgs e)
         {
             var urlHistory = new List<string>();
-            for (var i = 0; i < cbSource.Items.Count; i++)
+            foreach (var sourceItem in cbSource.Items)
             {
-                urlHistory.Add(cbSource.GetItemText(cbSource.Items[i]));
+                urlHistory.Add(cbSource.GetItemText(sourceItem));
             }
 
             updateInner(cbSource.Text.Trim(), urlHistory);
-        }
-
-        private bool isCbSourceItemsContains(string uri)
-        {
-            for (var i = 0; i < cbSource.Items.Count; i++)
-            {
-                if (cbSource.GetItemText(cbSource.Items[i]) == uri) return true;
-            }
-            return false;
         }
 
         private void updateInner(string uri, List<string> urlHistory)
@@ -114,8 +145,10 @@ namespace NanoLogViewer.Forms
                             var text = HttpTools.download(uri, size != null ? (int?)Math.Max(0, size.Value - 1024*1024) : null);
                             runInFormThread(() =>
                             {
-                                if (!isCbSourceItemsContains(uri)) cbSource.Items.Add(uri);
-                                parse(text);
+                                addItemToComboBox(cbSource, uri);
+                                
+                                allLoadedObjects = parse(text);
+                                fillListView(allLoadedObjects);
                                 btUpdate.Enabled = true;
                                 cbSource.Text = uri;
                             });
@@ -158,8 +191,10 @@ namespace NanoLogViewer.Forms
 				{
                     if (File.Exists(uri))
                     {
-                        if (!isCbSourceItemsContains(uri)) cbSource.Items.Add(uri);
-                        parse(File.ReadAllText(uri));
+                        addItemToComboBox(cbSource, uri);
+
+                        allLoadedObjects = parse(File.ReadAllText(uri));
+                        fillListView(allLoadedObjects);
                         btUpdate.Enabled = true;
                     }
                     else
@@ -170,16 +205,12 @@ namespace NanoLogViewer.Forms
             }
 		}
 
-        void parse(string text)
+        List<JObject> parse(string text)
         {
-            noRemeberColumns = true;
-
-            wbDetails.DocumentText = "";
-
+            var r = new List<JObject>();
+            
             text = text.Replace("\r\n", "\n").Replace("\r", "\n");
-
-            lvLogLines.Clear();
-
+            
             var lines = text.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
             {
@@ -187,7 +218,27 @@ namespace NanoLogViewer.Forms
                 if (!json.StartsWith("{")) continue;
 
                 var obj = JObject.Parse(json);
+                r.Add(obj);
+            }
 
+            return r;
+        }
+
+        void fillListView(IEnumerable<JObject> allObjects)
+        {
+            noRemeberColumns = true;
+
+            wbDetails.DocumentText = "";
+
+            lvLogLines.Clear();
+
+            var objectsToDisplay = new List<JObject>();
+            foreach (var obj in allObjects)
+            {
+                if (!isDisplayObject(obj)) continue;
+                
+                objectsToDisplay.Add(obj);
+                
                 foreach (var prop in obj)
                 {
                     if (!lvLogLines.Columns.ContainsKey(prop.Key))
@@ -197,13 +248,8 @@ namespace NanoLogViewer.Forms
                 }
             }
 
-            foreach (var line in lines)
+            foreach (var obj in objectsToDisplay)
             {
-                var json = line.Trim();
-                if (!json.StartsWith("{")) continue;
-
-                var obj = JObject.Parse(json);
-
                 var subItems = new List<string>();
                 foreach (ColumnHeader col in lvLogLines.Columns)
                 {
@@ -247,6 +293,12 @@ namespace NanoLogViewer.Forms
 
             lvLogLines.Refresh();
         }
+        
+        private bool isDisplayObject(JObject obj)
+        {
+            var s = JsonConvert.SerializeObject(obj);
+            return s.Contains(cbFilter.Text);
+        }
 
         private void lvLogLines_SelectedIndexChanged(object sender, EventArgs e)
 		{
@@ -285,25 +337,6 @@ namespace NanoLogViewer.Forms
             return value.ToString() ?? "";
         }
 
-        private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            var sources = new List<string>();
-            for (var i = Math.Max(0, cbSource.Items.Count - 10); i < cbSource.Items.Count; i++)
-            {
-                sources.Add(cbSource.GetItemText(cbSource.Items[i]));
-            }
-            File.WriteAllLines(sourcesIniFileName, sources);
-
-            rememberListState();
-
-            var columns = new List<string>();
-            foreach (var key in columnIndexes.OrderBy(x => x.Value).Select(x => x.Key))
-            {
-                columns.Add(key + ":" + columnWidths[key]);
-            }
-            File.WriteAllLines(columnsIniFileName, columns);
-        }
-
         private void LvLogLines_ColumnReordered(object sender, ColumnReorderedEventArgs e)
         {
             rememberListState();
@@ -327,7 +360,51 @@ namespace NanoLogViewer.Forms
 
         private void CbSource_SelectedIndexChanged(object sender, EventArgs e)
         {
+            if (freezed.Contains(cbSource)) return;
+
             btUpdate_Click(null, null);
+        }
+
+        private void btClearFilter_Click(object sender, EventArgs e)
+        {
+            cbFilter.Text = "";
+            fillListView(allLoadedObjects);
+        }
+
+        private void cbFilter_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (freezed.Contains(cbFilter)) return;
+
+            fillListView(allLoadedObjects);
+        }
+
+        private void cbFilter_TextUpdate(object sender, EventArgs e)
+        {
+            if (freezed.Contains(cbFilter)) return;
+            
+            timerUpdateAfterFilterChange.Stop();
+            timerUpdateAfterFilterChange.Start();
+        }
+
+        private void timerUpdateAfterFilterChange_Tick(object sender, EventArgs e)
+        {
+            fillListView(allLoadedObjects);
+
+            if (cbFilter.Text != "")
+            {
+                addItemToComboBox(cbFilter, cbFilter.Text);
+            }
+            
+            timerUpdateAfterFilterChange.Stop();
+        }
+
+        private void addItemToComboBox(ComboBox cb, string item)
+        {
+            if (cb.Items.Contains(item)) return;
+            
+            freezed.Add(cb);
+            cb.Items.Insert(0, item);
+            freezed.Remove(cb);
         }
     }
 }
